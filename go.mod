@@ -1,4 +1,4 @@
-module wiz-quiz
+module github.com/ranand16/wiz-quiz
 
 go 1.25.4
 
