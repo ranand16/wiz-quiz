@@ -59,7 +59,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	// If the wizard is finished, show a summary message
 	if m.done {
-		return fmt.Sprintf("\n Done! Created package: %s\n", m.inputs[0].Value())
+		return fmt.Sprintf("\n Done! %s\n", m.inputs[0].Value())
 	}
 
 	// Render the progress header, the current question title, and the input box
