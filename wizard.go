@@ -1,3 +1,6 @@
+// Package wizard is a small library for running interactive terminal wizards.
+// You give it a list of questions, it handles the TUI, and hands back the answers.
+// Built on top of Bubble Tea, so it follows the Elm architecture (Init/Update/View).
 package wizard
 
 import (
@@ -7,31 +10,33 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// model holds everything the wizard needs to know at any point in time.
+// It's unexported — callers never touch this directly, only through RunQuestions.
 type model struct {
 	questions []Question
-	inputs    []ti.Model
-	index     int
+	inputs    []ti.Model // one input field per question, all initialised upfront
+	index     int        // the question the user is currently on
 	done      bool
-	err       string
+	err       string // last validation error — shown inline below the input
 }
 
-// ======================================
-// Init function of the ELM architecture
+// Init kicks off the cursor blink. Without this the text input just sits there looking dead.
 func (m model) Init() tea.Cmd {
 	return ti.Blink
 }
 
-// =====================================
-// Updte function of the ELM architecture
-// return m and command to be executed
+// Update handles incoming events. Most of the interesting logic is in the
+// keypress handling — everything else just gets forwarded to the active input.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) { // this is a syntax for type switch since we dont know the type of msg that will be entered by the user
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc": // if the user presses ctrl + c or esc, we will quit the program
+		case "ctrl+c", "esc":
 			return m, tea.Quit
-		case "enter": // if the user presses enter
-			// Run callback for validation
+		case "enter":
+			// Run the callback before moving on. If it returns an error, we
+			// stay on the current question and show the message — the user
+			// has to fix their answer before they can continue.
 			if cb := m.questions[m.index].Callback; cb != nil {
 				if err := cb(m.inputs[m.index].Value()); err != nil {
 					m.err = err.Error()
@@ -39,32 +44,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.err = ""
-			if m.index == len(m.questions)-1 { // if we are at the last question, then we are done and we can quit the program
+			if m.index == len(m.questions)-1 {
+				// That was the last question, we're done.
 				m.done = true
 				return m, tea.Quit
 			}
-			// otherwise go to next question and focus on the input
 			m.index++
 			return m, m.inputs[m.index].Focus()
 		}
 	}
-	// otherwise, we will update the input box with the user's input
+	// Any other keypress goes straight to the active text input.
 	var cmd tea.Cmd
 	m.inputs[m.index], cmd = m.inputs[m.index].Update(msg)
 	return m, cmd
 }
 
-// =====================================
-// View function
+// View is called by Bubble Tea after every Update to produce the string that
+// gets rendered to the terminal. Keep it fast — no side effects here.
 func (m model) View() string {
-	// If the wizard is finished, show a summary message
 	if m.done {
 		return fmt.Sprintf("\n Done! %s\n", m.inputs[0].Value())
 	}
 
-	// Render the progress header, the current question title, and the input box
 	errMsg := ""
 	if m.err != "" {
+		// Render the validation error right below the input so it's hard to miss.
 		errMsg = fmt.Sprintf("\n⚠ Error: %s", m.err)
 	}
 
@@ -78,8 +82,8 @@ func (m model) View() string {
 	) + "\n\n(press enter to continue)\n"
 }
 
-// =====================================
-// RunQuestions is the function that will be called from the main.go file to run the wizard and get the answers from the user
+// RunQuestions runs the wizard and blocks until the user answers everything or
+// quits with ctrl+c / esc. Answers come back in the same order as the questions.
 func RunQuestions(q []Question) (answers []string, err error) {
 	updatedModel, err := tea.NewProgram(initializeModel(q)).Run()
 	if err != nil {
@@ -93,15 +97,15 @@ func RunQuestions(q []Question) (answers []string, err error) {
 	return answers, err
 }
 
-// ======================================
-// 1. Inintialie the model with the quesiton I want to ask about the github codebase
+// initializeModel wires up the starting state. We pre-create all the input
+// fields here rather than on demand — this way any answers already typed are
+// preserved if we ever add back/forward navigation in the future.
 func initializeModel(q []Question) model {
-	// 1. The questions
 	questions := make([]string, len(q))
 	for i, question := range q {
 		questions[i] = question.Question
 	}
-	// 2. Get the inputs
+
 	inputs := make([]ti.Model, len(questions))
 	for i := range questions {
 		inputs[i] = ti.New()
@@ -109,15 +113,10 @@ func initializeModel(q []Question) model {
 		inputs[i].Focus()
 	}
 
-	//  We will initialize the Model
-	model := model{
+	return model{
 		questions: q,
 		inputs:    inputs,
 		index:     0,
 		done:      false,
 	}
-
-	// 3. return and start asking the questions
-	return model
-
 }
