@@ -2,22 +2,10 @@
 
 A tiny Go library for running interactive terminal wizards. You give it a list of questions, it handles the TUI, and hands back the answers in order. Supports inline validation so you can reject a bad answer before letting the user move on.
 
-```
-Setup Wizard [2/3]
-
-What is your email?
-
-> not-an-email
-
-⚠ Error: that doesn't look like a valid email
-
-(press enter to continue)
-```
-
 ## Install
 
 ```bash
-go get github.com/ranand16/wiz-quiz@v0.1.1
+go get github.com/ranand16/wiz-quiz@v0.1.2
 ```
 
 ## Usage
